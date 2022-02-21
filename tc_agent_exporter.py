@@ -7,10 +7,22 @@ import os
 from requests.auth import HTTPBasicAuth
 
 TC_BASE_URL = os.environ["TC_BASE_URL"]
-auth = HTTPBasicAuth(os.environ["TC_USER"], os.environ["TC_PW"])
+TC_BEARER = os.environ.get('TC_BEARERTOKEN', None)
 
+if os.environ.get("TC_USER") is not None:
+    auth = HTTPBasicAuth(os.environ["TC_USER"], os.environ["TC_PW"])
+else:
+    auth = None
 
 def run():
+    if TC_BEARER is None and auth is None:
+        print("No Login or Bearer defined")
+        exit(1)
+
+    headers={"Accept": "application/json"}
+    if TC_BEARER is not None:
+        headers["authorization"] = "Bearer " + TC_BEARER
+
     start_http_server(9300)
     g_connected = Gauge(
         "teamcity_agent_connected",
@@ -31,13 +43,13 @@ def run():
         response = requests.get(
             "{}agents".format(TC_BASE_URL),
             auth=auth,
-            headers={"Accept": "application/json"},
+            headers=headers,
         )
         for agent in response.json()["agent"]:
             agentdetailsResponse = requests.get(
                 "{}agents/id:{}".format(TC_BASE_URL, agent["id"]),
                 auth=auth,
-                headers={"Accept": "application/json"},
+                headers=headers,
             )
             agentdetails = agentdetailsResponse.json()
             os_name = [
